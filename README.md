@@ -1,8 +1,3 @@
-Voici la **version nettoyée**, **sans aucun emoji / icône**, avec le **titre corrigé** comme tu l’as demandé.
-Tu peux **copier-coller directement** dans `README.md`.
-
----
-
 # OnDemandMobileVersion
 
 OnDemandAPP est une application mobile développée avec **React Native (Expo)**, permettant de mettre en relation des **clients** et des **prestataires de services** via une plateforme centralisée.
@@ -187,3 +182,4 @@ Toute utilisation commerciale nécessite une autorisation préalable.
 
 * aligner le nom du repo, du projet et de l’app
 * créer un README séparé pour le backend
+
