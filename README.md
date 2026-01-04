@@ -36,7 +36,7 @@ L’application communique avec un **backend .NET sécurisé**, offrant une exp�
 * SQL Server
 * JWT
 * Firebase Admin SDK
-* AES (chiffrement)
+
 
 ---
 
@@ -182,4 +182,5 @@ Toute utilisation commerciale nécessite une autorisation préalable.
 
 * aligner le nom du repo, du projet et de l’app
 * créer un README séparé pour le backend
+
 
