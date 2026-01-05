@@ -28,8 +28,9 @@ export default function RegisterScreen({ navigation }) {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  const handleSubmit = async () => {
+const handleSubmit = async () => {
   setLoading(true);
+
   try {
     const result = await register(
       formData.email,
@@ -38,16 +39,22 @@ export default function RegisterScreen({ navigation }) {
       formData.role
     );
 
- 
-      navigation.replace('Login', {
-        email: formData.email,
-        role: formData.role
-      });
-
+   
+    if (result?.role === 'client') {
+      navigation.replace('Login', { email: formData.email });
       return;
-    
+    }
+
+    if (result?.role === 'provider_pending_onboarding') {
+      navigation.replace('ProviderOnboarding');
+      return;
+    }
+
+    // fallback sécurité
+    return;
 
   } catch (error) {
+ 
     Alert.alert(
       "Erreur",
       error?.response?.data?.message || "Erreur lors de l'inscription"
