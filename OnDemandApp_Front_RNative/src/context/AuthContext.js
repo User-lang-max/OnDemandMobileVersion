@@ -166,11 +166,7 @@ export const AuthProvider = ({ children }) => {
         return { success: true, role: res.data.role };
       }
     } catch (err) {
-      if (err?.response?.data?.error === 'EmailNonVerifie') {
-        await signOut(firebaseAuth);
-        return { success: true, requiresEmailVerification: true };
-      }
-      throw err;
+        console.log('REGISTER ERROR =', err?.response?.data || err.message);
     }
 
     await signOut(firebaseAuth);
