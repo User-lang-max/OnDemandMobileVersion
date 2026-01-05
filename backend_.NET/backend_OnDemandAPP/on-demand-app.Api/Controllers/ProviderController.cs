@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Security.Claims;
@@ -10,6 +10,8 @@ using Microsoft.EntityFrameworkCore;
 using OnDemandApp.Core.Entities;
 using OnDemandApp.Infrastructure.Data;
 using OnDemandApp.Api.Services;
+using OnDemandApp.Api.DTOs;
+using OnDemandApp.Infrastructure.Interfaces;
 
 namespace OnDemandApp.Api.Controllers
 {
@@ -20,11 +22,13 @@ namespace OnDemandApp.Api.Controllers
     {
         private readonly AppDbContext _db;
         private readonly FirebaseNotificationService _notifService;
+        private readonly IFileService _fileService;
 
-        public ProviderController(AppDbContext db, FirebaseNotificationService notifService)
+        public ProviderController(AppDbContext db, FirebaseNotificationService notifService, IFileService fileService)
         {
             _db = db;
             _notifService = notifService;
+            _fileService = fileService;
         }
 
         private Guid GetUserId()
@@ -162,56 +166,62 @@ namespace OnDemandApp.Api.Controllers
         }
 
 
+        [Authorize]
         [HttpPost("onboarding")]
-        public async Task<IActionResult> SubmitOnboarding([FromBody] OnboardingRequest req)
+        [Consumes("multipart/form-data")]
+        public async Task<IActionResult> SubmitOnboarding(
+     [FromForm] ProviderOnboardingDto dto
+ )
         {
-            var userId = GetUserId();
-            var p = await GetOrCreate(userId);
+            var userId = Guid.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
 
+            var provider = await _db.ProviderProfiles
+                .Include(p => p.Services)
+                .FirstOrDefaultAsync(p => p.UserId == userId);
 
-            p.Bio = req.Bio;
-            p.PhotoUrl = req.PhotoUrl;
-            p.CvUrl = req.CvUrl;
+            if (provider == null)
+                return NotFound("Profil prestataire introuvable");
 
-            // Conversion sécurisée de la date 
-            if (!string.IsNullOrEmpty(req.InterviewDate) && DateTime.TryParse(req.InterviewDate, out var date))
+            // --- Infos dossier ---
+            provider.Bio = dto.Bio;
+            provider.InterviewDate = dto.InterviewDate;
+            provider.IsOnboardingCompleted = true;
+            provider.UpdatedAt = DateTime.UtcNow;
+
+            // --- FICHIERS ---
+            if (dto.Cv != null)
+                provider.CvUrl = await _fileService.SaveAsync(dto.Cv, "cvs");
+
+            if (dto.Photo != null)
+                provider.PhotoUrl = await _fileService.SaveAsync(dto.Photo, "photos");
+
+            // --- SERVICES SÉLECTIONNÉS ---
+            _db.ProviderServices.RemoveRange(provider.Services);
+
+            var serviceIds = dto.Services
+                .Split(',', StringSplitOptions.RemoveEmptyEntries)
+                .Select(int.Parse)
+                .ToList();
+
+            foreach (var serviceItemId in serviceIds)
             {
-                p.InterviewDate = date;
-            }
-            else
-            {
-                p.InterviewDate = null;
-            }
-
-            p.IsOnboardingCompleted = true;
-
-            // 2. Gestion des Services
-            if (req.SelectedServiceIds != null && req.SelectedServiceIds.Any())
-            {
-                foreach (var itemId in req.SelectedServiceIds)
+                _db.ProviderServices.Add(new ProviderService
                 {
-                    var exists = await _db.ProviderServices.AnyAsync(x => x.ProviderProfileUserId == userId && x.ServiceItemId == itemId);
-                    if (!exists)
-                    {
-                        var item = await _db.ServiceItems.FindAsync(itemId);
-                        _db.ProviderServices.Add(new ProviderService
-                        {
-                            ProviderProfileUserId = userId,
-                            ServiceItemId = itemId,
-                            BasePrice = item?.MinPrice ?? 100,
-                            IsActive = true
-                        });
-                    }
-                }
+                    ProviderProfileUserId = userId,
+                    ServiceItemId = serviceItemId,
+                    BasePrice = 100m,
+                    IsActive = true
+                });
             }
-
-            // Statut User en attente
-            var user = await _db.Users.FindAsync(userId);
-            if (user != null) user.Status = UserStatus.pending;
 
             await _db.SaveChangesAsync();
-            return Ok(new { message = "Candidature reçue." });
+
+            return Ok(new
+            {
+                message = "Onboarding prestataire complété avec succès"
+            });
         }
+
 
         // --- 4. SERVICES ---
         [HttpGet("services")]
